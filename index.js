@@ -1,15 +1,32 @@
-const { Client } = require('whatsapp-web.js');
-const client = new Client();
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 
-client.on('qr', qr => {
-  console.log('Сканируй QR:');
-  console.log(qr);
-});
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth');
 
-client.on('message', msg => {
-  if (msg.body === '!привет') {
-    msg.reply('Привет 👋');
-  }
-});
+  const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: true,
+  });
 
-client.initialize();
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message) return;
+
+    // ❗ Игнорируем свои сообщения
+    if (msg.key.fromMe) return;
+
+    const text =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text ||
+      '';
+
+    // 🔹 Команда
+    if (text === '!привет') {
+      await sock.sendMessage(msg.key.remoteJid, { text: 'Привет 👋' });
+    }
+  });
+}
+
+startBot();
